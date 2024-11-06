@@ -264,9 +264,9 @@ prc_zero_col <- round(colSums(caracteristicas_int_t==0)/
 n_zero_col_all <- sum(prc_zero_col >= 100)
 ```
 
-Vemos que el número de filas con todas las columnas a 0 es `r n_zero_row_all`.
+El número de filas con todas las columnas a 0 es `r n_zero_row_all`.
 
-Vemos que el número de columnas con todas las filas a 0 es `r n_zero_col_all`.
+El número de columnas con todas las filas a 0 es `r n_zero_col_all`.
 
 Después, evaluamos la varianza 0 de las características, y vemos que no hay ninguna característica con varianza 0.
 
@@ -959,27 +959,14 @@ poma_cor <- PomaCorr(se_poma_imputado_log_scaling, label_size = 8)
 
 y mostramos las correlaciones entre características > 0.99.
 
-
 ```{r, echo=FALSE}
 df_poma_cor <- poma_cor$correlations
 df_poma_cor_top <- df_poma_cor[abs(df_poma_cor$corr) > 0.99,]
 ```
 
-
 ```{r, echo=FALSE}
 kable(df_poma_cor_top, booktabs = T, caption = "Correlaciones mayores a 0.99 obtenidas mediante PomaCorr().")
 ```
-
-
-
-
-
-
-
-
-
-
-
 
 # Descarga de datos
 
