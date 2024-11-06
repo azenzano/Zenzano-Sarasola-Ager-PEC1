@@ -1,0 +1,994 @@
+---
+title: 'ANÁLISIS DE DATOS ÓMICOS'
+subtitle: 'PEC1'
+author: "Ager Zenzano Sarasola - UOC"
+date: "1 de noviembre de 2024"
+output:
+  bookdown::pdf_document2:
+     keep_tex: no #se puede poner yes
+     #number_sections: yes
+     toc: False #list of content
+     toc_depth: 3
+     fig_caption: yes
+     fig_height: 5.0
+     fig_width: 8.0
+bibliography: bibliography.bib     
+link-citations: yes
+figurelist: yes
+header-includes:
+- \usepackage{mathrsfs}       # To include mathsrc fonts
+- \usepackage{float}          # To insert figures caption
+- \floatplacement{figure}{H}  # To insert figures caption
+- \floatplacement{table}{H}
+- \usepackage{xcolor}
+- \usepackage{framed}
+- \usepackage{fancyhdr}
+- \pagestyle{fancy}
+- \fancyhf{}
+- \fancyhead[CE,CO]{\leftmark}
+- \fancyfoot[LE,RO]{\thepage}
+- \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+- \usepackage{amsmath} 
+- \usepackage[format=plain,labelfont={bf,it},labelfont={color=blue},textfont=it]{caption}
+- \usepackage[backend=biber, style=alphabetic, citestyle=authortitle]{biblatex}
+- \usepackage{sectsty}
+- \sectionfont{\clearpage}
+- \usepackage{sectsty} # a pagebreak for every top level heading
+- \sectionfont{\clearpage} #a pagebreak for every top level heading
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message = FALSE,comment = NA, number_sections = FALSE)
+```
+
+# Introducción
+
+En el presente documento recogeremos los pasos que iremos completando en el proceso que seguiremos para analizar datos ómicos. En el mismo recogeremos las técnicas y herramientas que iremos utilizando para la exploración multivariante de los datos.
+
+Inicialmente seleccionaremos un conjunto de datos de metabolómica que obtendremos del siguiente repositorio de github: https://github.com/nutrimetabolomics/metaboData/. Utilizaremos el contenedor @SummarizedExperiment24 como soporte de los datos, de manera que podremos acceder tanto a los datos como a los metadatos incluidos en el estudio.
+
+# Adquisición de los datos
+
+## Breve descripción del estudio ST000291
+
+```{r, echo=FALSE}
+library(metabolomicsWorkbenchR)
+library(dplyr)
+library(tidyverse)
+library(rvest)
+library(ggrepel)
+library(kableExtra)
+library(POMA)
+
+library(POMA)
+library(ggtext)
+library(patchwork)
+
+library(gplots)
+library(FactoMineR)
+library(made4)
+
+library("gplots")
+```
+
+Los datos de metabolómica que estudiaremos serán los que se pueden encontrar en https://github.com/nutrimetabolomics/metaboData/2024-fobitools-UseCase_1/. No obstante, obtendremos el estudio, @ST000291 leyéndolo manualmente de la base de datos Metabolomics Workbench usando la función `do_query()` del paquete `metabolomicsWorkbenchR` de `Bioconductor`, tal y como lo hacemos a continuación: 
+
+```{r, eval=FALSE}
+SE_ST000291 = do_query(
+  context = 'study',
+  input_item = 'study_id',
+  input_value = 'ST000291',
+  output_item = 'SummarizedExperiment'
+)
+```
+
+
+Este estudio `SE_ST000291` tuvo como objetivo investigar los cambios metabólicos globales inducidos por el consumo de jugo de arándano o jugo de manzana utilizando un enfoque metabolómico global basado en LC-MS. 
+
+Según la documentación recogida @ST000291 para el estudio se reclutaron dieciocho estudiantes universitarias sanas de entre 21 y 29 años con un IMC normal de 18,5 a 25. A cada una de ellas se le proporcionó una lista de alimentos que contenían cantidades significativas de procianidinas, como arándanos rojos, manzanas, uvas, arándanos azules, chocolate y ciruelas. Las participantes fueron asignadas aleatoriamente en dos grupos (n = 9) para consumir jugo de arándano o jugo de manzana. El estudio tuvo como objetivo investigar los cambios metabólicos generales provocados por los concentrados de procianidinas de arándanos rojos y manzanas utilizando un enfoque metabolómico global basado en LC-MS. Para mayor detalle de la descripción del estudio se puede consultar en @ST000291.
+
+La técnica Liquid Chromatography-Mass Spectrometry o también conocido por sus siglas en inglés como, LC-MS, combina la espectrometría de masas (MS) con el método de cromatografía líquida (Fuente @Vipin24). De esta manera, se combina la capacidad que tiene la espectrometría de masas (MS) de separar moléculas orgánicas según su masa molecular permitiendo así su detección y cuantificación con una sensibilidad extremadamente alta, con la cromatografía líquida que facilita la separación rápida y cuantitativa de compuestos entre sí. 
+
+Vemos que el objeto del estudio `SE_ST000291` debido al tipo de técnica utilizada lo componen dos análisis; el positivo AN000464 y el negativo AN000464.
+
+```{r, eval=FALSE}
+SE_ST000291
+```
+
+## Descripción del contenedor SummarizedExperiment
+
+@SummarizedExperiment24 es un contenedor (Clase S4) para almacenar tanto los datos de análisis como los metadatos. Los datos de análisis son de tipo matriz donde las filas representan características de interés (por ejemplo, genes, transcripciones, exones, etc.) y las columnas representan muestras. Los datos de análisis y los metadatos se mantienen sincronizados mediante operaciones de subconjunto y reordenación. Existe disponible una serie de funciones para acceder, agregar y editar la información almacenada en los distintos componentes de los objetos `SummarizedExperiment`.
+
+```{r}
+analisis_negativo <- do_query(
+  context = "study",
+  input_item = "analysis_id",
+  input_value = "AN000465",
+  output_item = "SummarizedExperiment")
+
+analisis_positivo <- do_query(
+  context = "study",
+  input_item = "analysis_id",
+  input_value = "AN000464",
+  output_item = "SummarizedExperiment")
+```
+
+Ambos análisis los contendremos en dos objetos o instancias `SummarizedExperiment` de clase S4. Además, podes añadir clase que `SummarizedExperiment` es una extensión de la clase `ExpressionSet` y muchas aplicaciones o bases de datos (como `metabolomicsWorkbench`) lo utilizan en vez de usar `ExpressionSet`.
+
+Resumido de manera esquemática la estructura de `SummarizedExperiment` se estructuraría de la siguiente manera:
+
+* SummarizedExperiment:
+  * Samples (Columns): colData(SE)
+  * Features (Rows): rowData(SE)
+  * Features (Matriz de datos, Rows x Columns) : assay(SE)
+  * Metadata: metada(SE)
+  
+La información sobre las características se almacena en un objeto `DataFrame`, anidado dentro del objeto `SummarizedExperiment` y accesible mediante la función `rowData()`. En nuestro casos vemos los metabolitos.
+
+```{r, echo=FALSE}
+kable(head(SummarizedExperiment::rowData(analisis_negativo),10), booktabs = T, caption = "Características: primeros 10 metabolitos del análisis, rowData().")
+```
+  
+La información sobre las muestras se almacena en otro objeto `DataFrame`, también anidado dentro del objeto `SummarizedExperiment`, y al que se puede acceder mediante la función `colData()`. En nuestro casos vemos las muestras y el tratamiento que sigue la muestra.
+
+```{r, echo=FALSE}
+kable(head(SummarizedExperiment::colData(analisis_negativo),10), booktabs = T, caption = "Muestras: primeras 10 del análisis, colData().")
+```
+
+Para acceder a los datos del experimento de un objeto `SummarizedExperiment`, se puede utilizar el descriptor de acceso `assays()`. Además, hacemos uso de la funcionalidad de `subset` que ofrece el objeto `SummarizedExperiment` para mantener la muestra de datos reducida en caso de requerirlo.
+
+```{r}
+analisis_negativo[1:5, 1:10]
+```
+
+```{r, echo=FALSE}
+kable(SummarizedExperiment::assay(analisis_negativo[1:10, 1:10]), booktabs = T, caption = "Matriz de datos: primeras 10 características, primeras 10 muestras del análisis, assay().")
+```
+
+Mediante la función `elementMetadata()` podemos acceder a los nombres de los metabolitos,
+
+```{r, echo=FALSE}
+kable(head(SummarizedExperiment::elementMetadata(analisis_negativo),10), booktabs = T, caption = "Características: primeros 10 metabolitos del análisis, elementMetadata().")
+```
+
+# Pre-procesado de datos
+
+En este apartado llevaremos a cabo una primera exploración de los datos, de tal manera que trataremos de proporcionar una visión general de los mismos. Además, nos basaremos en el flujo de trabajo de preprocesado realizado por @Castellano24 y también haremos uso del paquete @Poma24 desarrollado por él mismo.
+
+Inicialmente, obtenemos las características de modo negativo del estudio:
+
+```{r}
+caracteristica_n <- SummarizedExperiment::assay(analisis_negativo) %>%
+  dplyr::slice(-n())
+
+rownames(caracteristica_n) <- SummarizedExperiment::rowData(analisis_negativo)$
+  metabolite[1:(length(SummarizedExperiment::rowData(analisis_negativo)$metabolite)-1)]
+```
+
+y posteriormente las características de modo positivo del estudio:
+  
+```{r}
+caracteristica_p <- SummarizedExperiment::assay(analisis_positivo) %>%
+  dplyr::slice(-n())
+
+rownames(caracteristica_p) <- SummarizedExperiment::rowData(analisis_positivo)$
+  metabolite[1:(length(SummarizedExperiment::rowData(analisis_positivo)$metabolite)-1)]
+```
+
+A continuación, mediante el paquete `rvest` de @metabolomicsworkbench24 descargamos los nombres estandarizados de los metabolitos que estamos estudiando,
+
+```{r}
+metabolitoURL <- paste0('https://www.metabolomicsworkbench.org/data/',
+                        'show_metabolites_by_study.php?',
+                        'STUDY_ID=ST000291&SEARCH_TYPE=',
+                        'KNOWN&STUDY_TYPE=MS&RESULT_TYPE=1')
+metabolito <- metabolitoURL %>% 
+  read_html() %>% 
+  html_nodes(".datatable")
+
+metabolito_n <- metabolito %>%
+  .[[1]] %>%
+  html_table() %>%
+  dplyr::select(`Metabolite Name`, PubChemCompound_ID, `Kegg Id`)
+
+metabolito_p <- metabolito %>%
+  .[[2]] %>%
+  html_table() %>%
+  dplyr::select(`Metabolite Name`, PubChemCompound_ID, `Kegg Id`)
+
+metabolitos <- bind_rows(metabolito_n, metabolito_p) %>%
+  dplyr::rename(names = 1, PubChem = 2, KEGG = 3) %>%
+  mutate(KEGG = ifelse(KEGG == "-", "UNKNOWN", KEGG),
+         PubChem = ifelse(PubChem == "-", "UNKNOWN", PubChem)) %>%
+  distinct(PubChem, .keep_all = TRUE)
+```
+
+Una vez hayamos recogido los nombres estandarizados de los metabolitos de la web, procedemos a asignarlos a los metabolitos que estamos estudiando sobre las `características`.
+
+```{r, eval=TRUE}
+caracteristicas <- bind_rows(caracteristica_n, caracteristica_p) %>%
+  tibble::rownames_to_column("names") %>%
+  left_join(metabolitos, by = "names") %>%
+  select(-names, -KEGG) %>%
+  drop_na(PubChem) %>%
+  tibble::column_to_rownames("PubChem")
+```
+
+Cabe destacar, que al realizar la acción `drop_na(PubChem)` estaremos eliminando aquellos metabolitos que no han sido asociados mediante la `left_join` con la tabla `metabolitos` (nombres estandarizados que hemos obtenido de @metabolomicsworkbench24). Es decir, estaremos eliminando aquellos metabolitos que no hemos conseguido identificar.
+
+```{r, eval=TRUE}
+metadatos <- SummarizedExperiment::colData(analisis_negativo) %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("ID") %>%
+  mutate(Treatment = case_when(
+    Treatment == "Baseline urine" ~ "Baseline",
+    Treatment == "Urine after drinking apple juice" ~ "Apple",
+    Treatment == "Urine after drinking cranberry juice" ~ "Cranberry"))
+```
+
+## Comprobación de los datos
+
+A continuación, comprobamos los tipos de los datos,
+
+```{r}
+caracteristicas_int <- caracteristicas
+num = 0
+nrows = nrow(caracteristicas)
+for (i in 1:nrows) {
+  if (class(caracteristicas[i,])=="numeric") {
+    num = num + 1
+  }
+}
+```
+
+y vemos que de los `r nrows` metabolitos hay `r num` de tipo numérico numéricos. Por ello, procedemos a modificar su tipo y los convertimos a numérico.
+
+```{r}
+caracteristicas_int <- caracteristicas %>% mutate_if(is.character,as.numeric)
+```
+
+Después, analizamos si existen valores nulos e iguales a 0.
+
+```{r}
+caracteristicas_int_t <- t(caracteristicas_int)
+
+n_row <- rownames(caracteristicas_int_t)
+n_col <- colnames(caracteristicas_int_t)
+n_na <- sum(is.na(caracteristicas_int_t))
+
+prc_zero_row <- round(rowSums(caracteristicas_int_t==0)/
+                        ncol(caracteristicas_int_t) * 100,2)
+n_zero_row_all <- sum(prc_zero_row == 100)
+prc_zero_col <- round(colSums(caracteristicas_int_t==0)/
+                        nrow(caracteristicas_int_t) * 100,2)
+n_zero_col_all <- sum(prc_zero_col >= 100)
+```
+
+Vemos que el número de filas con todas las columnas a 0 es `r n_zero_row_all`.
+
+Vemos que el número de columnas con todas las filas a 0 es `r n_zero_col_all`.
+
+Después, evaluamos la varianza 0 de las características, y vemos que no hay ninguna característica con varianza 0.
+
+```{r}
+var_zero <- data.frame(caracteristicas_int_t) %>%
+  summarise_all(~ var(., na.rm = TRUE)) %>%
+  t() %>%
+  as.data.frame() %>%
+  rownames_to_column("names") %>%
+  filter(V1 == 0)
+dim(var_zero)
+var_zero
+```
+
+Una vez realizadas las primeras exploraciones, asignados los nombres estandarizados a los metabolitos y quedarnos con aquellos a los que hemos conseguido identificar un nombre estandarizado, utilizamos la función `PomaCreateObject` del paquete `Poma` de `Bioconductor` en `R` para crear el objeto de tipo `SummarizedExperiment`.
+
+```{r}
+se_poma <- PomaCreateObject(metadata = metadatos, features = caracteristicas_int_t)
+```
+
+Comprobamos la dimensión del objeto y vemos esta es: `r dim(se_poma)`.
+
+## Inputación de datos faltantes
+
+A partir del objeto de tipo `SummarizedExperiment`, el paquete , @Poma24 de @Castellano24 nos permite utilizar funcionalidades para el análisis de datos. En este caso haremos uso de la función `PomaImpute()` para imputar observaciones faltantes sobre el conjunto de datos.
+
+En el caso que vemos a continuación probamos parametrizar la función con método de imputación `knn`, y al final decidimos no convertimos los 0 a nulos y después los eliminamos,
+
+```{r}
+se_poma_imputado <- se_poma %>% 
+  PomaImpute(method = "knn", cutoff = 20) #, zeros_as_na = TRUE, remove_na = TRUE
+se_poma_imputado
+```
+vemos que no se han identificado datos faltantes en el conjunto de datos. No obstante, era lo que esperado ya que no habíamos identificados valores nulo en el apartado anterior.
+
+```{r, fig.cap = "Digrama de cajas de las muestras, una vez se han inputado observaciones con knn. Se diferencia el color por tipo de tratamiento,  PomaImpute().", fig.width=8, fig.height=3.5, echo=FALSE}
+PomaBoxplots(se_poma_imputado, x = "samples")
+```
+
+```{r, fig.cap = "Digrama de densidad de las muestras, una vez se han inputado observaciones con knn, PomaImpute().", fig.width=4, fig.height=3.5, echo=FALSE}
+se_poma_imputado_sample = se_poma_imputado[1: 100,]
+PomaDensity(se_poma_imputado_sample, x = "features", 
+            theme_params = list(legend_title = FALSE)) + 
+  ggplot2::theme(legend.position="none",
+    axis.text.x = ggplot2::element_blank(),
+    axis.title.x = ggplot2::element_text(size = 10),
+    axis.title.y = ggplot2::element_text(size = 10))
+```
+
+
+## Normalización de los datos
+
+Probamos diferentes métodos de normalización que se pueden realizar mediante el paquete `Poma`,
+
+```{r}
+se_poma_imputado_sin <- PomaNorm(se_poma_imputado, method = "none")
+se_poma_imputado_auto_scaling <- PomaNorm(se_poma_imputado, method = "auto_scaling")
+se_poma_imputado_level_scaling <- PomaNorm(se_poma_imputado, method = "level_scaling")
+se_poma_imputado_log_scaling <- PomaNorm(se_poma_imputado, method = "log_scaling")
+se_poma_imputado_vast_scaling <- PomaNorm(se_poma_imputado, method = "vast_scaling")
+se_poma_imputado_log_pareto <- PomaNorm(se_poma_imputado, method = "log_pareto")
+```
+
+y comprobamos si después de normalizar el conjunto de datos sufre alguna reducción de la dimensión. Cabe destacar que `PomaNorm()` solo modifica la dimensión de los datos cuando el conjunto de datos contiene solo características cero o características de varianza cero.
+
+```{r}
+dim(SummarizedExperiment::assay(se_poma_imputado_sin))
+dim(SummarizedExperiment::assay(se_poma_imputado_auto_scaling))
+dim(SummarizedExperiment::assay(se_poma_imputado_level_scaling))
+dim(SummarizedExperiment::assay(se_poma_imputado_log_scaling))
+dim(SummarizedExperiment::assay(se_poma_imputado_vast_scaling))
+dim(SummarizedExperiment::assay(se_poma_imputado_log_pareto))
+```
+
+Analizamos la influencia de la normalización sobre las muestras,
+
+```{r, fig.cap = "Digrama de cajas de las muestras, normalizadas con difererentes métodos: none, auto_scaling, level_scaling, log_scaling, log_pareto, vast_scaling. Se diferencia el color por tipo de tratamiento, PomaNorm().", fig.width=8, fig.height=4.5, echo=FALSE}
+
+a <- PomaBoxplots(se_poma_imputado_sin, 
+                  x = "samples",                  
+                  theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Sin norm</font>") +
+  ggplot2::theme(axis.text.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_text(size = 10))
+
+b <- PomaBoxplots(se_poma_imputado_auto_scaling, 
+                  x = "samples",                  
+                  theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Auto</font>") +
+  ggplot2::theme(axis.text.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_text(size = 10))
+
+c <- PomaBoxplots(se_poma_imputado_level_scaling, 
+                  x = "samples",                  
+                  theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Level</font>") +
+  ggplot2::theme(axis.text.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_text(size = 10))
+
+d <- PomaBoxplots(se_poma_imputado_log_scaling, 
+                  x = "samples",                  
+                  theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Log scaling</font>") +
+  ggplot2::theme(axis.text.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_text(size = 10))
+
+e <- PomaBoxplots(se_poma_imputado_vast_scaling, 
+                  x = "samples",                  
+                  theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Vast scaling</font>") +
+  ggplot2::theme(axis.text.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_text(size = 10))
+
+f <- PomaBoxplots(se_poma_imputado_log_pareto, 
+                  x = "samples",                  
+                  theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Log pareto</font>") +
+  ggplot2::theme(axis.text.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_text(size = 10))
+
+(a+b+c)/(d+e+f)
+
+```
+
+Analizamos la influencia de la normalización sobre las características,
+
+```{r, fig.cap = "Digrama de densidad de las muestras, normalizadas con difererentes métodos: none, auto_scaling, level_scaling, log_scaling, log_pareto, vast_scaling. Se diferencia el color por tipo de tratamiento, PomaNorm().", fig.width=8, fig.height=4.5, echo=FALSE}
+
+g <- PomaDensity(se_poma_imputado_sin, 
+                 x = "features", 
+                 theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Sin norm</font>") +
+  ggplot2::theme(axis.title.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())
+h <- PomaDensity(se_poma_imputado_auto_scaling, 
+                 x = "features", 
+                 theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Auto</font>") +
+  ggplot2::theme(axis.title.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())
+i <- PomaDensity(se_poma_imputado_level_scaling, 
+                 x = "features", 
+                 theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Level</font>") +
+  ggplot2::theme(axis.title.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())
+j <- PomaDensity(se_poma_imputado_log_scaling, 
+                 x = "features", 
+                 theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Log scaling</font>") +
+  ggplot2::theme(axis.title.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())
+k <- PomaDensity(se_poma_imputado_vast_scaling, 
+                 x = "features", 
+                 theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Vast scaling</font>") +
+  ggplot2::theme(axis.title.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())
+l <- PomaDensity(se_poma_imputado_log_pareto, 
+                 x = "features", 
+                 theme_params = list(legend_title = FALSE, legend_position = "none")) +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Log Pareto</font>") +
+  ggplot2::theme(axis.title.x = ggplot2::element_blank(),
+                 axis.title.y = ggplot2::element_blank())
+(g+h+i)/(j+k+l)
+```
+
+A continuación, vemos con el gráfico de densidad `PomaDensity()` las dos opciones: `Log scaling` y `Log pareto`.
+
+```{r, fig.cap = "Digrama de densidad de las muestras, una vez se han inputado observaciones con knn para Log Scaling y Log Pareto. Se diferencia el color por tipo de tratamiento, PomaImpute().", fig.width=8, fig.height=4.5, echo=FALSE}
+
+pl_logpareto = PomaDensity(se_poma_imputado_log_scaling, x = "features", 
+            theme_params = list(legend_title = FALSE)) + 
+  theme(legend.position="none") +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Log Scaling</font>")
+
+pl_autoscaling = PomaDensity(se_poma_imputado_log_pareto, x = "features", 
+            theme_params = list(legend_title = FALSE)) + 
+  theme(legend.position="none") +
+  ggplot2::labs(title="<span style='font-size: 12pt;'>Log Pareto</font>")
+
+pl_logpareto+pl_autoscaling
+```
+
+## Pre-procesado sin datos atípicos
+
+Después de normalizar el conjunto de datos utilizamos la función `PomaOutliers()` del paquete `Poma` para pre-procesar los datos eliminando los valores atípicos en caso de que los haya. Utilizamos los parámetros:
+
+  * `method`: indica el método de medición de distancia para realizar MDS (Multidimensional Scaling).
+  * `type`: indica el tipo de análisis de valores atípicos a realizar.
+  * `coef`: indica el coeficiente de valores atípicos.Cuanto más bajo es mayor será la sensibilidad ante los valores atípicos.
+
+Primero, realizamos una comparativa con los datos sin normalizar,
+
+```{r}
+se_poma_preprocesado <- se_poma_imputado_sin %>%
+      PomaOutliers(method = "euclidean",
+                   type = "median",
+                   coef = 2)
+```
+
+```{r, echo=FALSE}
+pl_se_poma_preprocesado_polygon_plot <- se_poma_preprocesado$polygon_plot
+pl_se_poma_preprocesado_distance_boxplot <- se_poma_preprocesado$distance_boxplot
+```
+
+```{r, fig.cap = "Digrama poligonal de las de las coordenadas 1 y dos para cada tratamiento: Cranberry, Apple, Baseline, y diagrama de cajas con las distancias al centroide del grupo para cada tratamiento: Cranberry, Apple, Baseline, PomaOutliers().", fig.width=8, fig.height=4.5, echo=FALSE}
+pl_se_poma_preprocesado_polygon_plot+pl_se_poma_preprocesado_distance_boxplot
+```
+
+```{r, echo=FALSE}
+se_poma_preprocesado_outliers <- se_poma_preprocesado$outliers
+kable(se_poma_preprocesado_outliers, booktabs = T, caption = "Datos atipicos identificados mediante la función PomaOutliers() en el atributo outliers.")
+```
+
+y después con los datos normalizados, 
+
+```{r}
+se_poma_preprocesado <- se_poma_imputado_log_scaling %>%
+      PomaOutliers(method = "euclidean",
+                   type = "median",
+                   coef = 2)
+```
+
+```{r, echo=FALSE}
+pl_se_poma_preprocesado_polygon_plot <- se_poma_preprocesado$polygon_plot
+pl_se_poma_preprocesado_distance_boxplot <- se_poma_preprocesado$distance_boxplot
+```
+
+```{r, fig.cap = "Digrama poligonal de las de las coordenadas 1 y dos para cada tratamiento: Cranberry, Apple, Baseline, y diagrama de cajas con las distancias al centroide del grupo para cada tratamiento: Cranberry, Apple, Baseline, una vez escalados los datos, PomaOutliers().", fig.width=8, fig.height=4.5, echo=FALSE}
+pl_se_poma_preprocesado_polygon_plot+pl_se_poma_preprocesado_distance_boxplot
+```
+
+```{r, echo=FALSE}
+se_poma_preprocesado_outliers <- se_poma_preprocesado$outliers
+kable(se_poma_preprocesado_outliers, booktabs = T, caption = "Datos atipicos identificados mediante la función PomaOutliers() en el atributo outliers.")
+```
+
+
+Vemos que en el conjunto de datos sin normalizar existen valores atípicos, mientras que en el normalizado no.
+
+# Análisis estadísticos
+
+## Análisis PCA
+
+El análisis de los componentes principales se utiliza para resumir y obtener la información contenida en un conjuntos de datos multivariantes. Este método de proyección o de reducción de la dimensión es de uso habitual en la exploración de datos ómicos (fuente @Bakker24).
+
+El análisis de componentes principales (PCA) lleva a cabo una transformación mediante la combinación de la variables originales correlacionadas entres sí, a componentes principales no correlacionados. Cada uno de los componentes explica una parte de la variabilidad, y se construyen de manera ordenada, siendo la primera la que mayor variabilidad explica, después la segunda y así sucesivamente.
+
+El análisis de componentes principales (PCA) es un enfoque basado en el cálculo de los valores propios. Este método identifica un conjunto de ecuaciones lineales que resumen una matriz cuadrada simétrica. A partir de este método, se produce un conjunto de valores propios $\lambda$, y cada uno estos tiene un vector propio asociado $x$. La conexión citada se puede describir mediante la siguiente ecuación:
+
+$$Ax = \lambda x$$
+siendo los valores propios $\lambda$ los que representan la varianza extraída de cada eje, y $x$ los vectores propios asociados con la misma posición relativa
+
+Inicialmente utilizaremos la función `PomaPCA()` del paquete `Poma` para calcular los componentes principales,
+
+```{r}
+se_poma_imputado_log_scaling_pca <- PomaPCA(se_poma_imputado_log_scaling)
+```
+
+mediante el argumento `factors` con el operador `$` obtendremos los vectores propios contenidos el objeto calculado,
+
+```{r, echo=FALSE}
+se_poma_imputado_log_scaling_pca$factors <- se_poma_imputado_log_scaling_pca$factors %>% 
+ mutate_if(is.numeric, round, digits=3)
+
+kable(head(se_poma_imputado_log_scaling_pca$factors,10), booktabs = T, caption = "Primeros 10 muestras sobre los 4 primeros componentes, factors de PomaPCA().")
+```
+
+mediante el argumento `loadings` con el operador `$` obtendremos los vectores propios contenidos el objeto calculado,
+
+```{r, echo=FALSE}
+se_poma_imputado_log_scaling_pca$loadings <- se_poma_imputado_log_scaling_pca$loadings %>% 
+ mutate_if(is.numeric, round, digits=3)
+
+kable(head(se_poma_imputado_log_scaling_pca$loadings,10), booktabs = T, caption = "Vectores propios, primeras 10 de las características sobre los 4 primeros componentes, `loadings` de PomaPCA().")
+```
+
+
+```{r, echo=FALSE}
+pl_poma_pca_a <- se_poma_imputado_log_scaling_pca$factors_plot
+pl_poma_pca_b <- se_poma_imputado_log_scaling_pca$eigenvalues_plot
+pl_poma_pca_c <- se_poma_imputado_log_scaling_pca$loadings_plot
+```
+
+```{r, fig.cap = "Digrama de puntos de los dos primeros PCs, y Loadings para las características por PC.", fig.width=8, fig.height=4.5, echo=FALSE}
+(pl_poma_pca_a+pl_poma_pca_c)
+```
+
+
+## Análisis PCA manual
+
+A continuación, realizaremos el cálculo del PCA de manera manual siguiendo los pasos de @Sanchez24a: 
+
+  * normalizaremos los datos,
+  * calcularemos la matriz de varianza/covarianza,
+  * obtendremos los valores y vectores propios y los interpretaremos.
+
+**Normalizar datos**
+
+```{r}
+caracteristicas_int_t_scaled <- scale(caracteristicas_int_t)
+```
+
+**Calcular matriz de Varianza/Covarianza**
+
+Diagonalizando la matriz de varianzas-covarianzas de los datos centrados obtendremos: un vector de valores propios proporcionales a la varianza de cada variable en las nuevas coordenadas, y una matriz de vectores propios que son las puntuaciones de las observaciones en estas coordenadas (fuente @Sanchez24a). Al diagonalizar la matriz de varianzas conseguiremos que las covarianzas de las nuevas variables valgan 0, es decir, que sean independientes (fuente @Sanchez24b).
+
+```{r}
+VCM <- cov(caracteristicas_int_t_scaled)
+```
+
+**Calcular valores propios**
+
+```{r}
+VCM_eigen <- eigen(VCM)
+```
+
+**Interpretar valores propios**
+
+```{r, echo=FALSE}
+VCM_eigen_values <- VCM_eigen$values
+VCM_eigen_values <- VCM_eigen_values[round(VCM_eigen_values,3) > 0]
+
+dim_valores_p <- length(VCM_eigen_values)
+```
+
+Habrá tantos valores propios como variables haya, no obstante valores > 0, habrá `r dim_valores_p`
+
+```{r, echo=FALSE}
+round(VCM_eigen_values,3)
+```
+
+Comprobamos que la suma de los valores propios es `r sum(VCM_eigen$values)`, la misma que el número características, `r ncol(caracteristicas_int_t)`.
+
+Los valores propios representan la varianza de las componentes por lo que cada valor dividido por la suma de éstos es el porcentaje de variabilidad explicado (fuente @Sanchez24a, @Sanchez24b).
+
+```{r}
+VCM_eigen_prop <- round(VCM_eigen$values / sum(VCM_eigen$values),3)
+VCM_eigen_prop <- VCM_eigen_prop[VCM_eigen_prop > 0]
+VCM_eigen_prop
+```
+
+En total suman el `r round(sum(VCM_eigen_prop),2)`
+
+
+**Interpretar vectores propios**
+
+Los vectores propios, obtenidos a partir del atributo `vectors` son las coordenadas de las componentes principales. La transformación de los datos asociada a las componentes principales se obtiene multiplicando la matriz original por la matriz de vectores propios (fuente @Sanchez24a, @Sanchez24b).
+
+```{r}
+pcas <- round(caracteristicas_int_t_scaled %*% VCM_eigen$vectors,3)
+```
+
+```{r, echo=FALSE}
+df_pcas <- pcas[,1:4]
+colnames(df_pcas)<- c("PC1","PC2", "PC3", "PC4")
+kable(head(df_pcas,10), booktabs = T, caption = "Primeras 10 de las primeros muestras sobre los 4 primeros componentes, factors.")
+```
+
+A continuación mostramos los 4 primeros vectores propios del atributo `vectors`, que son las coordenadas de las componentes principales. Por motivos de no sobre extender demasiado su visualización mostramos solo los 10 primero valores.
+
+```{r, echo=FALSE}
+loadings <- VCM_eigen$vectors[ ,1:4] %>%
+  data.frame(row.names = colnames(caracteristicas_int_t_scaled)) %>%
+  dplyr::rename("PC1" = X1, "PC2" = X2, "PC3" = X3, "PC4" = X4) %>%
+  round(digits = 3) %>%
+  select(PC1,PC2,PC3,PC4) %>%
+  head(10)
+```
+
+```{r, echo=FALSE}
+kable(loadings, booktabs = T, caption = "Vectores propios, primeras 10 de las características primeros sobre los 4 primeros componentes, vectors.")
+```
+
+Vemos que los resultados son ligeramente diferentes respecto a los obtenidos con el paquete `Poma` porque el tratamiento que se ha realizado sobre el conjunto de datos ha sido ligeramente diferente.
+
+
+```{r, echo=FALSE}
+se_poma_pca <- PomaCreateObject(metadata = metadatos, features = caracteristicas_int_t)
+pca_poma = PomaPCA(se_poma_pca)
+```
+
+```{r, echo=FALSE}
+t_pca_poma_loadings <- pca_poma %>%
+  loadings %>%
+  tibble::column_to_rownames("feature") %>%
+  round(3)
+
+kable(head(t_pca_poma_loadings,10), booktabs = T, caption = "Vectores propios, primeras 10 características primeros sobre los 4 primeros componentes, loadings de PomaPCA().")
+```
+
+**Calculo PCA mediante `prcomp`**
+
+También podemos calcular los componentes principales mediante las función `prcomp`. La función `princomp` calcula las componentes principales mediante la descomposición en valores singulares de la matriz de datos (fuente @Sanchez24a). 
+
+
+```{r}
+caracteristicas_t_PCA_prcomp <- prcomp(caracteristicas_int_t, 
+                                       scale. = TRUE, center = TRUE) # rank. = 4
+```
+
+El argumento `sdev` contiene las desviaciones estándar, es decir las raíces cuadradas de los valores propios (fuente @Sanchez24a). 
+
+
+```{r}
+round(caracteristicas_t_PCA_prcomp$sdev,3)
+```
+
+
+y podemos compararlos con los obtenidos manualmente:
+
+```{r}
+round(sqrt(VCM_eigen_values),3)
+```
+
+En el objeto que obtenemos a partir de la función `prcomp` los vectores los encontramos en el argumento `rotation`,
+
+```{r, echo=FALSE}
+kable(round(caracteristicas_t_PCA_prcomp$rotation[1:10,1:4],3), booktabs = T, caption = "Vectores propios, primeras 10 de las características primeros sobre los 4 primeros componentes, `rotation` de `prcomp()`")
+```
+
+Finalmente el argumento `x` contiene las componentes principales calculadas por `prcomp`.
+
+```{r, echo=FALSE}
+kable(round(caracteristicas_t_PCA_prcomp$x,3)[1:10,1:4], booktabs = T, caption = "Primeras 10 muestras sobre los 4 primeros componentes, x.")
+```
+
+Vemos el porcentaje de varianza explicada por cada uno de los primeros 4 componente calculados con la función `prcomp`.
+
+```{r, echo=FALSE}
+caracteristicas_t_PCA_prcomp_t_sum <- summary(caracteristicas_t_PCA_prcomp)$importance
+caracteristicas_t_PCA_prcomp_t_sum <- round(caracteristicas_t_PCA_prcomp_t_sum[,1:4],3)
+kable(caracteristicas_t_PCA_prcomp_t_sum, booktabs = T, caption = "Importancia para cada uno de los primeros 4 componente, prcomp().")
+```
+
+
+```{r, fig.cap = "Digrama de barras del porcentaje de varianza explicada por cada dimensión PC, prcomp().", fig.width=5, fig.height=3.8, echo=FALSE}
+library(factoextra)
+fviz_eig(caracteristicas_t_PCA_prcomp)
+```
+
+Del gráfico anterior vemos que con el primer componente principal se explica aproximadamente un 25% de la varianza total por lo que no parece un valor muy elevado. Además, cabe destacar que de este primer componente al segundo hay un salto considerable.
+
+A continuación visualizamos las muestras de forma sencilla el PCA de los datos en los dos primeros componentes, 
+
+```{r, fig.cap = "Digrama de puntos de los dos primeros PCs.", fig.width=5, fig.height=3.8, echo=FALSE}
+loads<- round(caracteristicas_t_PCA_prcomp$sdev^2/sum(caracteristicas_t_PCA_prcomp$sdev^2)*100,3) 
+xlab<-c(paste("PC1: ",loads[1],"%")) 
+ylab<-c(paste("PC2: ",loads[2],"%"))
+plot(caracteristicas_t_PCA_prcomp$x[,1:2],xlab=xlab,ylab=ylab, col=1,
+        xlim=c(min(caracteristicas_t_PCA_prcomp$x[,1])-10, max(caracteristicas_t_PCA_prcomp$x[,1])+10),
+        ylim=c(min(caracteristicas_t_PCA_prcomp$x[,2])-10, max(caracteristicas_t_PCA_prcomp$x[,2])+10))
+text(caracteristicas_t_PCA_prcomp$x[,1],caracteristicas_t_PCA_prcomp$x[,2], NULL, pos=3, cex=0.8)
+title(paste("Gráfica de puntos de 2 PCs", "", sep=" "), cex=0.8)
+```
+
+Ha simple vista y con los resultados obtenidos resulta complicado debido sobre todo a la gran dimensión del conjunto de datos y sin ningún conocimiento de los metabolitos poder buscar un explicación razonable a cada componente como agrupación abstracta de diferentes características.
+
+## Test de Limma
+
+Utilizamos el modelo Limma (fuente @Ritchie15) mediante la función `PomaLimma()` del paquete @Poma24 para identificar los metabolitos más significativos entre los grupos `Base` y `Cranberry`.
+
+```{r}
+limma_res_bc <- se_poma_imputado_log_scaling %>%
+  PomaLimma(contrast = "Baseline-Cranberry", adjust = "fdr") %>%
+  dplyr::rename(PubChemCID = feature) %>% 
+  dplyr::mutate(PubChemCID = gsub("X", "", PubChemCID))
+```
+
+y mostramos las primeras 10 características.
+
+```{r, echo=FALSE}
+kable(head(limma_res_bc,10), booktabs = T, caption = "Primeros 10 de los metabolitos más significativos según el test de Lima entre los grupos: Baseline-Cranberry, PomaLimma().")
+```
+
+
+y a continuación, identificaremos lo metabolitos más significativos entre los grupos Base y Apple,
+
+```{r}
+limma_res_ba <- se_poma_imputado_log_scaling %>%
+  PomaLimma(contrast = "Baseline-Apple", adjust = "fdr") %>%
+  dplyr::rename(PubChemCID = feature) %>% 
+  dplyr::mutate(PubChemCID = gsub("X", "", PubChemCID))
+```
+
+y mostramos las primeras 10 características
+
+```{r, echo=FALSE}
+kable(head(limma_res_ba,10), booktabs = T, caption = "Primeros 10 de los metabolitos más significativos según el test de Lima entre los grupos: Baseline-Apple, PomaLimma().")
+```
+
+
+## Análsis de Correspondencias
+
+El análisis de correspondencias es una técnica de ordenación; una manera de representar las variables en un espacio de dimensión menor, que resulta especialmente adecuada para analizar y visualizar datos de tablas de contingencia con datos de frecuencias numéricas (fuente @Sanchez24b). El análisis de la tabla de frecuencias para el análisis de correspondencias puede plantearse de dos formas: como un escalado multidimensional de filas y de columnas con la distancia ji-cuadrado o como un análisis de componentes principales sobre la matriz `Z` estandarizada (fuente @Sanchez24b). El Análisis de Correspondencias es una manera de representar las variables en un espacio de dimensión menor.
+
+Para realizar las pruebas con el análisis de correspondencias, partiremos de los resultados obtenidos en el test de Lima del apartado anterior. De esta manera limitaremos el conjunto de metabolitos a analizar (seleccionamos los 8 que hemos identificado como los más significativos) .
+
+Iniciaremos el análisis preparando la estructura de datos necesaria:
+
+```{r}
+lima_bc_scope <- limma_res_bc[1:8,1]
+lima_bc_scope$scope <- 1
+lima_bc_scope_meta <- metadatos %>% 
+  filter(Treatment != "Apple")
+
+sample_caracteristicas_int_t <-caracteristicas_int %>%
+  tibble::rownames_to_column("PubChemCID") %>%
+  left_join(lima_bc_scope, by = "PubChemCID") %>%
+  filter(scope == 1) %>%
+  select(-scope) %>%
+  tibble::column_to_rownames("PubChemCID") %>%
+  t %>%
+  data.frame() %>%
+  tibble::rownames_to_column("ID") %>%
+  right_join(lima_bc_scope_meta, by = "ID") %>%
+  select(-Treatment) %>%
+  tibble::column_to_rownames("ID")
+
+sample_caracteristicas_int <- data.frame(t(sample_caracteristicas_int_t))
+```
+
+Antes de realizar el análisis de correspondencias observamos un gráfico sencillo `balloonplot()` (fuente  @Sanchez24b)
+
+```{r}
+
+dt <- as.table(as.matrix(sample_caracteristicas_int_t))
+balloonplot(t(dt), main ="Características: metabolitos", xlab ="", ylab="",
+            label = FALSE, show.margins = FALSE)
+```
+
+
+
+Utilizamos la función `CA()` del paquete `FactoMineR` para realizar el análisis de correspondencias,
+
+```{r}
+datos.ca <- CA(sample_caracteristicas_int_t, graph = FALSE)
+```
+
+y después visualizamos las dos primeras dimensiones:
+
+```{r, fig.cap = "Digrama de mapa de puntos en las  dos primera dimensiones del análisis de correspondencias, CA().", fig.width=5, fig.height=3.8, echo=FALSE}
+plot.CA(datos.ca)
+```
+
+
+## Cluster Analysis
+
+Los métodos de búsqueda de patrones o clases: Análisis de conglomerados y métodos aglomerativos (KMeans/PAM). Inicialmente realizaremos el análisis cluster con la función `PomaClust()` del paquete `Poma` sobre el conjunto de datos completos y posteriormente haremos pruebas sobre el subconjunto obtenidos a partir del test de Lima.
+
+
+```{r}
+se_poma_imputado_log_scaling_clust <- PomaClust(se_poma_imputado_log_scaling)
+```
+
+
+```{r, echo=FALSE}
+se_poma_imputado_log_scaling_clust_optimal_clusters_number <- se_poma_imputado_log_scaling_clust$optimal_clusters_number
+```
+
+El número óptimo de clusters obtenido con la función `PomaClust()` es `r se_poma_imputado_log_scaling_clust_optimal_clusters_number`
+
+```{r, fig.cap = "Digrama de analisis de numero de clusters óptimo, PomaClust()", fig.width=5, fig.height=3.5, echo=FALSE}
+pl_opti_ckus <- se_poma_imputado_log_scaling_clust$optimal_clusters_plot
+pl_opti_ckus
+```
+
+```{r, echo=FALSE}
+t_se_poma_imputado_log_scaling_clust_mds_coordinates <- se_poma_imputado_log_scaling_clust$mds_coordinates
+kable(head(t_se_poma_imputado_log_scaling_clust_mds_coordinates,10), booktabs = T, caption = "Primeras 10 muestras sobre los 4 primeros componentes, factors.")
+```
+
+
+```{r, fig.cap = "Digrama de puntos para las dos primeras dimensiones.", fig.width=5, fig.height=3.8, echo=FALSE}
+se_poma_imputado_log_scaling_clust$mds_plot
+```
+
+### Agrupación jerárquica
+
+El método jerárquico crea un árbol de clasificación o dendograma. Estrictamente, estos métodos no definen grupos, sino la estructura de asociación en cadena que puede existir entre los elementos (fuentes @Pena02 y @Sanchez24b). La similitud entre casos puede medirse mediante la distancia entre ellos. Hay diferentes formas de medir esta distancia, la más sencilla es la distancia euclidiana. Al calcular la distancia entre cada par obtenemos una matriz de distancias (fuente @Sanchez24b).
+
+Como ya hemos mencionado, una vez realizados las pruebas sobre el conjunto de datos completo lo haremos sobre el subconjunto ya mencionado.
+
+*Agrupación de características*
+
+Utilizaremos diferentes métodos de conglomeración: `average`, `centroid`, y el método para calcular la distancia será `euclidian`. Representaremos la estructura jerárquica mediante dendrogramas:
+
+```{r}
+carac_dist_single <- dist(sample_caracteristicas_int, method="euclidian")
+```
+
+```{r}
+carac_hc_UPGMA <- hclust(carac_dist_single, method="average") 
+carac_hc_centroid <- hclust(carac_dist_single, method="centroid") 
+```
+
+```{r, fig.cap = "Dendograma clusters para agrupación de características para método average y centroid sobre distancia euclidea.", fig.width=8, fig.height=3.8, echo=FALSE}
+par(mfrow=c(1,2)) 
+plot(carac_hc_UPGMA)
+plot(carac_hc_centroid)
+```
+
+*Agrupación de muestras*
+
+Utilizaremos diferentes métodos de conglomeración: `average`, `centroid`, y el método para calcular la distancia será `euclidian`. Representaremos la estructura jerárquica mediante dendrogramas:
+
+```{r}
+carac_dist_single <- dist((sample_caracteristicas_int_t), method="euclidian")
+```
+
+```{r}
+carac_hc_UPGMA <- hclust(carac_dist_single, method="average") 
+carac_hc_centroid <- hclust(carac_dist_single, method="centroid") 
+```
+
+```{r, fig.cap = "Dendograma clusters para agrupación de muestras para método average y centroid sobre distancia euclidea.", fig.width=8, fig.height=3.8, echo=FALSE}
+par(mfrow=c(1,2)) 
+plot(carac_hc_UPGMA)
+plot(carac_hc_centroid)
+```
+
+### Agrupación por el método de las k-means
+
+La agrupación por el método k-medias es un método no jerárquico que crea una única partición de los datos. Se especifica a priori el número de grupos de casos que se desean formar. El método de las k-means permite estudiar la consistencia de la agrupación a partir del cálculo de las sumas de cuadrados dentro de cada grupo (fuente @Sanchez24b).
+
+*Agrupación de características*
+
+```{r, fig.cap = "Digrama de mapa de puntos sobre dos dimensiones a partir de agrupación por características con k-medias.", fig.width=5.0, fig.height=3.5, echo=FALSE}
+k <- c(3)
+km <- kmeans(sample_caracteristicas_int, k, iter.max=1000)
+
+fviz_cluster(km, data = sample_caracteristicas_int,
+             palette = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"),
+             ellipse.type = "euclid", 
+             star.plot = TRUE, 
+             repel = TRUE,
+             ggtheme = theme_minimal()
+)
+
+km$cluster
+```
+
+*Agrupación de muestras*
+
+```{r, fig.cap = "Digrama de mapa de puntos sobre dos dimensiones a partir de agrupación por características con k-medias.", fig.width=5.0, fig.height=3.5, echo=FALSE}
+k <- c(2)
+km <- kmeans(sample_caracteristicas_int_t, k, iter.max=1000)
+
+fviz_cluster(km, data = sample_caracteristicas_int_t,
+             palette = c("#2E9FDF", "#00AFBB", "#E7B800", "#FC4E07"),
+             ellipse.type = "euclid",
+             star.plot = TRUE,
+             repel = TRUE, #
+             ggtheme = theme_minimal()
+)
+
+km$cluster
+```
+
+
+## Correlaciones
+ 
+Calculamos las correlaciones entre características mediante la función `PomaCorr()`,
+
+```{r}
+poma_cor <- PomaCorr(se_poma_imputado_log_scaling, label_size = 8)
+```
+
+y mostramos las correlaciones entre características > 0.99.
+
+
+```{r, echo=FALSE}
+df_poma_cor <- poma_cor$correlations
+df_poma_cor_top <- df_poma_cor[abs(df_poma_cor$corr) > 0.99,]
+```
+
+
+```{r, echo=FALSE}
+kable(df_poma_cor_top, booktabs = T, caption = "Correlaciones mayores a 0.99 obtenidas mediante PomaCorr().")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+# Descarga de datos
+
+Finalmente exportamos 3 ficheros .csv: características.csv, metadatos.csv y metabolitos.csv. Y un fichero .Rda que contiene lo siguientes objetos de tipo `SummarizedExperiment`: se_poma, se_poma_imputado, se_poma_imputado_log_scaling, se_poma_preprocesado
+
+```{r}
+write.table(caracteristicas, sep=";", file="caracteristicas.csv")
+write.table(metadatos, sep=";", file="metadatos.csv")
+write.table(metabolitos, sep=";", file="metabolitos.csv")
+
+save(se_poma, se_poma_imputado, se_poma_imputado_log_scaling, se_poma_preprocesado, file = "azs_mydata.rda")
+```
+
+
+
+
+# Información de servicio
+
+```{r}
+sessionInfo()
+```
+
+
+
+
+# References
+
+\mbox{~}
+
+
+
+
+
