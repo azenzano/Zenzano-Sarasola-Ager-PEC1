@@ -83,13 +83,13 @@ SE_ST000291 = do_query(
 ```
 
 
-Este estudio `SE_ST000291` tuvo como objetivo investigar los cambios metabólicos globales inducidos por el consumo de jugo de arándano o jugo de manzana utilizando un enfoque metabolómico global basado en LC-MS. 
+Este estudio @ST000291 tuvo como objetivo investigar los cambios metabólicos globales inducidos por el consumo de jugo de arándano o jugo de manzana utilizando un enfoque metabolómico global basado en LC-MS. 
 
 Según la documentación recogida @ST000291 para el estudio se reclutaron dieciocho estudiantes universitarias sanas de entre 21 y 29 años con un IMC normal de 18,5 a 25. A cada una de ellas se le proporcionó una lista de alimentos que contenían cantidades significativas de procianidinas, como arándanos rojos, manzanas, uvas, arándanos azules, chocolate y ciruelas. Las participantes fueron asignadas aleatoriamente en dos grupos (n = 9) para consumir jugo de arándano o jugo de manzana. El estudio tuvo como objetivo investigar los cambios metabólicos generales provocados por los concentrados de procianidinas de arándanos rojos y manzanas utilizando un enfoque metabolómico global basado en LC-MS. Para mayor detalle de la descripción del estudio se puede consultar en @ST000291.
 
 La técnica Liquid Chromatography-Mass Spectrometry o también conocido por sus siglas en inglés como, LC-MS, combina la espectrometría de masas (MS) con el método de cromatografía líquida (Fuente @Vipin24). De esta manera, se combina la capacidad que tiene la espectrometría de masas (MS) de separar moléculas orgánicas según su masa molecular permitiendo así su detección y cuantificación con una sensibilidad extremadamente alta, con la cromatografía líquida que facilita la separación rápida y cuantitativa de compuestos entre sí. 
 
-Vemos que el objeto del estudio `SE_ST000291` debido al tipo de técnica utilizada lo componen dos análisis; el positivo AN000464 y el negativo AN000464.
+Vemos que el objeto del estudio @ST000291 debido al tipo de técnica utilizada lo componen dos análisis; el positivo AN000464 y el negativo AN000464.
 
 ```{r, eval=FALSE}
 SE_ST000291
@@ -113,7 +113,7 @@ analisis_positivo <- do_query(
   output_item = "SummarizedExperiment")
 ```
 
-Ambos análisis los contendremos en dos objetos o instancias `SummarizedExperiment` de clase S4. Además, podes añadir clase que `SummarizedExperiment` es una extensión de la clase `ExpressionSet` y muchas aplicaciones o bases de datos (como `metabolomicsWorkbench`) lo utilizan en vez de usar `ExpressionSet`.
+Ambos análisis los contendremos en dos objetos o instancias `SummarizedExperiment` de clase S4. Además, podemos añadir que la  clase `SummarizedExperiment` es una extensión de la clase `ExpressionSet` y muchas aplicaciones o bases de datos (como `metabolomicsWorkbench`) lo utilizan en vez de usar `ExpressionSet`.
 
 Resumido de manera esquemática la estructura de `SummarizedExperiment` se estructuraría de la siguiente manera:
 
@@ -129,7 +129,7 @@ La información sobre las características se almacena en un objeto `DataFrame`,
 kable(head(SummarizedExperiment::rowData(analisis_negativo),10), booktabs = T, caption = "Características: primeros 10 metabolitos del análisis, rowData().")
 ```
   
-La información sobre las muestras se almacena en otro objeto `DataFrame`, también anidado dentro del objeto `SummarizedExperiment`, y al que se puede acceder mediante la función `colData()`. En nuestro casos vemos las muestras y el tratamiento que sigue la muestra.
+La información sobre las muestras se almacena en otro objeto `DataFrame`, también anidado dentro del objeto `SummarizedExperiment`, y al que se puede acceder mediante la función `colData()`. En nuestro, caso vemos las muestras y el tratamiento que sigue cada muestra.
 
 ```{r, echo=FALSE}
 kable(head(SummarizedExperiment::colData(analisis_negativo),10), booktabs = T, caption = "Muestras: primeras 10 del análisis, colData().")
@@ -293,14 +293,15 @@ Comprobamos la dimensión del objeto y vemos esta es: `r dim(se_poma)`.
 
 A partir del objeto de tipo `SummarizedExperiment`, el paquete , @Poma24 de @Castellano24 nos permite utilizar funcionalidades para el análisis de datos. En este caso haremos uso de la función `PomaImpute()` para imputar observaciones faltantes sobre el conjunto de datos.
 
-En el caso que vemos a continuación probamos parametrizar la función con método de imputación `knn`, y al final decidimos no convertimos los 0 a nulos y después los eliminamos,
+En el caso que vemos a continuación, probamos parametrizar la función con método de imputación `knn`, y al final decidimos no convertir los 0 a nulos y después los eliminamos,
 
 ```{r}
 se_poma_imputado <- se_poma %>% 
   PomaImpute(method = "knn", cutoff = 20) #, zeros_as_na = TRUE, remove_na = TRUE
 se_poma_imputado
 ```
-vemos que no se han identificado datos faltantes en el conjunto de datos. No obstante, era lo que esperado ya que no habíamos identificados valores nulo en el apartado anterior.
+
+vemos que no se han identificado datos faltantes en el conjunto de datos. No obstante, era lo esperado ya que no habíamos identificados valores nulos en el apartado anterior.
 
 ```{r, fig.cap = "Digrama de cajas de las muestras, una vez se han inputado observaciones con knn. Se diferencia el color por tipo de tratamiento,  PomaImpute().", fig.width=8, fig.height=3.5, echo=FALSE}
 PomaBoxplots(se_poma_imputado, x = "samples")
@@ -457,7 +458,7 @@ Después de normalizar el conjunto de datos utilizamos la función `PomaOutliers
 
   * `method`: indica el método de medición de distancia para realizar MDS (Multidimensional Scaling).
   * `type`: indica el tipo de análisis de valores atípicos a realizar.
-  * `coef`: indica el coeficiente de valores atípicos.Cuanto más bajo es mayor será la sensibilidad ante los valores atípicos.
+  * `coef`: indica el coeficiente de valores atípicos. Cuanto más bajo es mayor será la sensibilidad ante los valores atípicos.
 
 Primero, realizamos una comparativa con los datos sin normalizar,
 
@@ -567,6 +568,8 @@ A continuación, realizaremos el cálculo del PCA de manera manual siguiendo los
 
 **Normalizar datos**
 
+Si las variables no están en la misma escala, no contribuyen de la misma manera a los resultados (fuente @Bakker24), por ello procedemos a usar la función `scale()` y normalizar los datos; restando la media y dividiendo por la desviación estándar.
+
 ```{r}
 caracteristicas_int_t_scaled <- scale(caracteristicas_int_t)
 ```
@@ -602,7 +605,7 @@ round(VCM_eigen_values,3)
 
 Comprobamos que la suma de los valores propios es `r sum(VCM_eigen$values)`, la misma que el número características, `r ncol(caracteristicas_int_t)`.
 
-Los valores propios representan la varianza de las componentes por lo que cada valor dividido por la suma de éstos es el porcentaje de variabilidad explicado (fuente @Sanchez24a, @Sanchez24b).
+Los valores propios representan la varianza de las componentes, por lo que cada valor dividido por la suma de éstos es el porcentaje de variabilidad explicado (fuente @Sanchez24a).
 
 ```{r}
 VCM_eigen_prop <- round(VCM_eigen$values / sum(VCM_eigen$values),3)
@@ -615,7 +618,7 @@ En total suman el `r round(sum(VCM_eigen_prop),2)`
 
 **Interpretar vectores propios**
 
-Los vectores propios, obtenidos a partir del atributo `vectors` son las coordenadas de las componentes principales. La transformación de los datos asociada a las componentes principales se obtiene multiplicando la matriz original por la matriz de vectores propios (fuente @Sanchez24a, @Sanchez24b).
+Los elementos de un vector propio se conocen como cargas (loadings) y éstas son los coeficientes de la ecuación lineal que combinan las variables para ese componente principal (fuente @Bakker24). La transformación de los datos asociada a las componentes principales se obtiene multiplicando la matriz original por la matriz de vectores propios (fuente @Sanchez24b, @Bakker24).
 
 ```{r}
 pcas <- round(caracteristicas_int_t_scaled %*% VCM_eigen$vectors,3)
@@ -709,7 +712,7 @@ library(factoextra)
 fviz_eig(caracteristicas_t_PCA_prcomp)
 ```
 
-Del gráfico anterior vemos que con el primer componente principal se explica aproximadamente un 25% de la varianza total por lo que no parece un valor muy elevado. Además, cabe destacar que de este primer componente al segundo hay un salto considerable.
+En el gráfico anterior, vemos que con el primer componente principal se explica aproximadamente un 25% de la varianza total por lo que no parece un valor muy elevado. Además, cabe destacar que de este primer componente al segundo hay un salto considerable.
 
 A continuación visualizamos las muestras de forma sencilla el PCA de los datos en los dos primeros componentes, 
 
@@ -724,7 +727,7 @@ text(caracteristicas_t_PCA_prcomp$x[,1],caracteristicas_t_PCA_prcomp$x[,2], NULL
 title(paste("Gráfica de puntos de 2 PCs", "", sep=" "), cex=0.8)
 ```
 
-Ha simple vista y con los resultados obtenidos resulta complicado debido sobre todo a la gran dimensión del conjunto de datos y sin ningún conocimiento de los metabolitos poder buscar un explicación razonable a cada componente como agrupación abstracta de diferentes características.
+Ha simple vista y con los resultados obtenidos resulta complicado debido sobre todo a la gran dimensión del conjunto de datos y sin ningún conocimiento de los metabolitos poder buscar un explicación razonable a cada componente como agrupación abstracta de las diferentes características.
 
 ## Test de Limma
 
@@ -762,7 +765,7 @@ kable(head(limma_res_ba,10), booktabs = T, caption = "Primeros 10 de los metabol
 
 ## Análsis de Correspondencias
 
-El análisis de correspondencias es una técnica de ordenación; una manera de representar las variables en un espacio de dimensión menor, que resulta especialmente adecuada para analizar y visualizar datos de tablas de contingencia con datos de frecuencias numéricas (fuente @Sanchez24b). El análisis de la tabla de frecuencias para el análisis de correspondencias puede plantearse de dos formas: como un escalado multidimensional de filas y de columnas con la distancia ji-cuadrado o como un análisis de componentes principales sobre la matriz `Z` estandarizada (fuente @Sanchez24b). El Análisis de Correspondencias es una manera de representar las variables en un espacio de dimensión menor.
+El análisis de correspondencias es una técnica de ordenación; una manera de representar las variables en un espacio de dimensión menor, que resulta especialmente adecuada para analizar y visualizar datos de tablas de contingencia con datos de frecuencias numéricas (fuente @Sanchez24b). El análisis de la tabla de frecuencias para el análisis de correspondencias puede plantearse de dos formas: como un escalado multidimensional de filas y de columnas con la distancia ji-cuadrado, o como un análisis de componentes principales sobre la matriz `Z` estandarizada (fuente @Sanchez24b). El Análisis de Correspondencias es una manera de representar las variables en un espacio de dimensión menor.
 
 Para realizar las pruebas con el análisis de correspondencias, partiremos de los resultados obtenidos en el test de Lima del apartado anterior. De esta manera limitaremos el conjunto de metabolitos a analizar (seleccionamos los 8 que hemos identificado como los más significativos) .
 
@@ -790,7 +793,7 @@ sample_caracteristicas_int_t <-caracteristicas_int %>%
 sample_caracteristicas_int <- data.frame(t(sample_caracteristicas_int_t))
 ```
 
-Antes de realizar el análisis de correspondencias observamos un gráfico sencillo `balloonplot()` (fuente  @Sanchez24b)
+Antes de realizar el análisis de correspondencias con la función `CA()`, observamos un gráfico sencillo `balloonplot()` donde cada celda contiene un punto cuyo tamaño refleja la magnitud relativa del componente correspondiente (fuente  @Sanchez24b).
 
 ```{r}
 
@@ -799,24 +802,40 @@ balloonplot(t(dt), main ="Características: metabolitos", xlab ="", ylab="",
             label = FALSE, show.margins = FALSE)
 ```
 
-
-
 Utilizamos la función `CA()` del paquete `FactoMineR` para realizar el análisis de correspondencias,
 
 ```{r}
 datos.ca <- CA(sample_caracteristicas_int_t, graph = FALSE)
 ```
 
-y después visualizamos las dos primeras dimensiones:
+y después visualizamos con la función `fviz_ca_biplot` las dos primeras dimensiones:
 
-```{r, fig.cap = "Digrama de mapa de puntos en las  dos primera dimensiones del análisis de correspondencias, CA().", fig.width=5, fig.height=3.8, echo=FALSE}
-plot.CA(datos.ca)
+```{r, fig.cap = "Digrama de mapa de puntos en las  dos primeras dimensiones del análisis de correspondencias, CA().", fig.width=5, fig.height=3.8, echo=FALSE}
+fviz_ca_biplot(datos.ca, repel = TRUE)
+```
+
+El siguiente gráfico se denomina gráfico simétrico y muestra un patrón global dentro de los datos. Las filas (muestras) se representan con puntos azules y las columnas (metabolitos) con triángulos rojos. La distancia entre los puntos de las filas o columnas proporciona una medida de su similitud o disimilitud. Los puntos de las filas con un perfil similar están cerca en el mapa de factores. Lo mismo se aplica a los puntos de las columnas.
+
+A continuación, se muestra el diagrama que muestra el porcentaje de varianza explicada por cada dimensión, donde la linea discontinua roja especifica la media de los valores propios.
+
+```{r, fig.cap = "Digrama de barras del porcentaje de varianza explicada por cada dimensión AC, CA().", fig.width=5, fig.height=3.8, echo=FALSE}
+fviz_screeplot(datos.ca) +
+ geom_hline(yintercept=33.33, linetype=2, color="red")
+```
+
+Según el gráfico anterior, la dimensión 1 explica el 56,3 % de la inercia total y la 2 explica aproximadamente el 24,2 % de la inercia, por lo que entre las dos llegarían a un 80,5 % de la inercia total. La dimensión 3 explica solo el 12 % de la inercia total, que es inferior al valor propio promedio (33 %) y demasiado poco como para conservarlo para un análisis posterior.
+
+Podemos utilizar la función `get_ca_row()` para extraer los resultados de las variables de fila (muestras). Esta función devuelve una lista que contiene las coordenadas, el `cos2`, que la contribución y la inercia de las variables de fila:
+
+```{r, fig.cap = "Digrama de mapa de puntos en las dos primeras dimensiones del análisis de correspondencias para las muestras, CA().", fig.width=5, fig.height=3.8, echo=FALSE}
+row <- get_ca_row(datos.ca)
+fviz_ca_row(datos.ca, alpha.row="cos2")
 ```
 
 
 ## Cluster Analysis
 
-Los métodos de búsqueda de patrones o clases: Análisis de conglomerados y métodos aglomerativos (KMeans/PAM). Inicialmente realizaremos el análisis cluster con la función `PomaClust()` del paquete `Poma` sobre el conjunto de datos completos y posteriormente haremos pruebas sobre el subconjunto obtenidos a partir del test de Lima.
+Los métodos de búsqueda de patrones o clases: análisis de conglomerados y métodos aglomerativos (KMeans/PAM) (fuente @Sanchez24b). Inicialmente realizaremos el análisis cluster con la función `PomaClust()` del paquete `Poma` sobre el conjunto de datos completos y posteriormente haremos pruebas sobre el subconjunto obtenidos a partir del test de Lima.
 
 
 ```{r}
@@ -828,7 +847,7 @@ se_poma_imputado_log_scaling_clust <- PomaClust(se_poma_imputado_log_scaling)
 se_poma_imputado_log_scaling_clust_optimal_clusters_number <- se_poma_imputado_log_scaling_clust$optimal_clusters_number
 ```
 
-El número óptimo de clusters obtenido con la función `PomaClust()` es `r se_poma_imputado_log_scaling_clust_optimal_clusters_number`
+El número óptimo de clusters obtenido con la función `PomaClust()` es `r. se_poma_imputado_log_scaling_clust_optimal_clusters_number`
 
 ```{r, fig.cap = "Digrama de analisis de numero de clusters óptimo, PomaClust()", fig.width=5, fig.height=3.5, echo=FALSE}
 pl_opti_ckus <- se_poma_imputado_log_scaling_clust$optimal_clusters_plot
@@ -840,6 +859,7 @@ t_se_poma_imputado_log_scaling_clust_mds_coordinates <- se_poma_imputado_log_sca
 kable(head(t_se_poma_imputado_log_scaling_clust_mds_coordinates,10), booktabs = T, caption = "Primeras 10 muestras sobre los 4 primeros componentes, factors.")
 ```
 
+En el siguiente gráfico vemos el diagrama de puntos para las dos primeras dimensiones diferenciando cada cluster por color.
 
 ```{r, fig.cap = "Digrama de puntos para las dos primeras dimensiones.", fig.width=5, fig.height=3.8, echo=FALSE}
 se_poma_imputado_log_scaling_clust$mds_plot
@@ -927,6 +947,7 @@ fviz_cluster(km, data = sample_caracteristicas_int_t,
 km$cluster
 ```
 
+En el gráfico anterior parece que se puede apreciar como las muestras de control se agrupan en torno al centroide de un cluster y las del otro tratamiento en torno al centroide del otro cluster.
 
 ## Correlaciones
  
@@ -969,10 +990,11 @@ write.table(caracteristicas, sep=";", file="caracteristicas.csv")
 write.table(metadatos, sep=";", file="metadatos.csv")
 write.table(metabolitos, sep=";", file="metabolitos.csv")
 
-save(se_poma, se_poma_imputado, se_poma_imputado_log_scaling, se_poma_preprocesado, file = "azs_mydata.rda")
+save(se_poma, se_poma_imputado, 
+     se_poma_imputado_log_scaling, se_poma_preprocesado, file = "azs_mydata.rda")
 ```
 
-
+Se pueden consultar el presente documento y así como las exportaciones realidas en la siguiete dirección git: https://github.com/azenzano/Zenzano-Sarasola-Ager-PEC1.
 
 
 # Información de servicio
