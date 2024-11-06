@@ -435,7 +435,7 @@ l <- PomaDensity(se_poma_imputado_log_pareto,
 (g+h+i)/(j+k+l)
 ```
 
-A continuación, vemos con el gráfico de densidad `PomaDensity()` las dos opciones: `Log scaling` y `Log pareto`.
+A continuación, vemos con el gráfico de densidad `PomaDensity()` las dos opciones más destacables: `Log scaling` y `Log pareto`.
 
 ```{r, fig.cap = "Digrama de densidad de las muestras, una vez se han inputado observaciones con knn para Log Scaling y Log Pareto. Se diferencia el color por tipo de tratamiento, PomaImpute().", fig.width=8, fig.height=4.5, echo=FALSE}
 
@@ -689,7 +689,7 @@ round(sqrt(VCM_eigen_values),3)
 En el objeto que obtenemos a partir de la función `prcomp` los vectores los encontramos en el argumento `rotation`,
 
 ```{r, echo=FALSE}
-kable(round(caracteristicas_t_PCA_prcomp$rotation[1:10,1:4],3), booktabs = T, caption = "Vectores propios, primeras 10 de las características primeros sobre los 4 primeros componentes, `rotation` de `prcomp()`")
+kable(round(caracteristicas_t_PCA_prcomp$rotation[1:10,1:4],3), booktabs = T, caption = "Vectores propios, primeras 10 de las características primeros sobre los 4 primeros componentes, `rotation` de prcomp().")
 ```
 
 Finalmente el argumento `x` contiene las componentes principales calculadas por `prcomp`.
@@ -795,8 +795,7 @@ sample_caracteristicas_int <- data.frame(t(sample_caracteristicas_int_t))
 
 Antes de realizar el análisis de correspondencias con la función `CA()`, observamos un gráfico sencillo `balloonplot()` donde cada celda contiene un punto cuyo tamaño refleja la magnitud relativa del componente correspondiente (fuente  @Sanchez24b).
 
-```{r}
-
+```{r, fig.cap = "Digrama de balones para los metabolitos seleccionados.", fig.width=5, fig.height=3.8, echo=FALSE}
 dt <- as.table(as.matrix(sample_caracteristicas_int_t))
 balloonplot(t(dt), main ="Características: metabolitos", xlab ="", ylab="",
             label = FALSE, show.margins = FALSE)
@@ -814,7 +813,7 @@ y después visualizamos con la función `fviz_ca_biplot` las dos primeras dimens
 fviz_ca_biplot(datos.ca, repel = TRUE)
 ```
 
-El siguiente gráfico se denomina gráfico simétrico y muestra un patrón global dentro de los datos. Las filas (muestras) se representan con puntos azules y las columnas (metabolitos) con triángulos rojos. La distancia entre los puntos de las filas o columnas proporciona una medida de su similitud o disimilitud. Los puntos de las filas con un perfil similar están cerca en el mapa de factores. Lo mismo se aplica a los puntos de las columnas.
+El gráfico anterior se denomina gráfico simétrico y muestra un patrón global dentro de los datos. Las filas (muestras) se representan con puntos azules y las columnas (metabolitos) con triángulos rojos. La distancia entre los puntos de las filas o columnas proporciona una medida de su similitud o disimilitud. Los puntos de las filas con un perfil similar están cerca en el mapa de factores. Lo mismo se aplica a los puntos de las columnas.
 
 A continuación, se muestra el diagrama que muestra el porcentaje de varianza explicada por cada dimensión, donde la linea discontinua roja especifica la media de los valores propios.
 
@@ -825,7 +824,7 @@ fviz_screeplot(datos.ca) +
 
 Según el gráfico anterior, la dimensión 1 explica el 56,3 % de la inercia total y la 2 explica aproximadamente el 24,2 % de la inercia, por lo que entre las dos llegarían a un 80,5 % de la inercia total. La dimensión 3 explica solo el 12 % de la inercia total, que es inferior al valor propio promedio (33 %) y demasiado poco como para conservarlo para un análisis posterior.
 
-Podemos utilizar la función `get_ca_row()` para extraer los resultados de las variables de fila (muestras). Esta función devuelve una lista que contiene las coordenadas, el `cos2`, que la contribución y la inercia de las variables de fila:
+Podemos utilizar la función `get_ca_row()` del paquete `factoextra` para extraer los resultados de las variables de fila (muestras). Esta función devuelve una lista que contiene las coordenadas, el `cos2`, que la contribución y la inercia de las variables de fila:
 
 ```{r, fig.cap = "Digrama de mapa de puntos en las dos primeras dimensiones del análisis de correspondencias para las muestras, CA().", fig.width=5, fig.height=3.8, echo=FALSE}
 row <- get_ca_row(datos.ca)
@@ -847,7 +846,7 @@ se_poma_imputado_log_scaling_clust <- PomaClust(se_poma_imputado_log_scaling)
 se_poma_imputado_log_scaling_clust_optimal_clusters_number <- se_poma_imputado_log_scaling_clust$optimal_clusters_number
 ```
 
-El número óptimo de clusters obtenido con la función `PomaClust()` es `r. se_poma_imputado_log_scaling_clust_optimal_clusters_number`
+El número óptimo de clusters obtenido con la función `PomaClust()` es `r se_poma_imputado_log_scaling_clust_optimal_clusters_number`
 
 ```{r, fig.cap = "Digrama de analisis de numero de clusters óptimo, PomaClust()", fig.width=5, fig.height=3.5, echo=FALSE}
 pl_opti_ckus <- se_poma_imputado_log_scaling_clust$optimal_clusters_plot
